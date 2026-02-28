@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Pipeline Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #18181f;
+    --bg4: #22222c;
+    --border: rgba(255,255,255,0.07);
+    --border-active: rgba(139,92,246,0.5);
+    --accent: #8b5cf6;
+    --accent2: #06b6d4;
+    --accent3: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ─── Sidebar ─────────────────────────────── */
+  .sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 0;
+    overflow-y: auto;
+  }
+  .sidebar-logo {
+    padding: 0 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-text {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .logo-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    font-size: 9px;
+    font-family: var(--mono);
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-left: 6px;
+    letter-spacing: 0.5px;
+    vertical-align: 2px;
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--green);
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: 0.4; }
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--text3);
+    text-transform: uppercase;
+    padding: 20px 20px 8px;
+  }
+  .config-item {
+    padding: 6px 20px;
+  }
+  .config-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-bottom: 5px;
+  }
+  .config-select {
+    width: 100%;
+    background: var(--bg4);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 6px 10px;
+    outline: none;
+    cursor: pointer;
+    transition: border 0.2s;
+  }
+  .config-select:hover { border-color: var(--border-active); }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--bg4);
+    border-radius: 2px;
+    outline: none;
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+  .slider-val {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    min-width: 30px;
+    text-align: right;
+  }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 20px;
+  }
+  .toggle-label { font-size: 12px; color: var(--text2); }
+  .toggle {
+    width: 32px; height: 18px;
+    background: var(--bg4);
+    border-radius: 9px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.3s;
+    border: 1px solid var(--border);
+  }
+  .toggle.on { background: var(--accent); border-color: var(--accent); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    background: white;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: left 0.3s;
+  }
+  .toggle.on::after { left: 16px; }
+  .rebuild-btn {
+    margin: 16px 20px 0;
+    background: transparent;
+    border: 1px solid var(--border-active);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    width: calc(100% - 40px);
+    transition: all 0.2s;
+  }
+  .rebuild-btn:hover { background: rgba(139,92,246,0.1); }
+
+  /* ─── Main area ──────────────────────────── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .topbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .page-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .page-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+  .stat-chips {
+    display: flex;
+    gap: 10px;
+  }
+  .chip {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text2);
+  }
+  .chip span { color: var(--text); font-weight: 700; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    gap: 2px;
+  }
+  .tab {
+    padding: 11px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab:hover:not(.active) { color: var(--text2); }
+
+  /* Content */
+  .content { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+  /* Chat */
+  .chat-container { max-width: 780px; }
+  .msg { display: flex; gap: 12px; margin-bottom: 20px; animation: fadeUp 0.3s ease; }
+  @keyframes fadeUp { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
+  .avatar {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0; margin-top: 2px;
+  }
+  .avatar.user { background: var(--accent); }
+  .avatar.bot { background: linear-gradient(135deg, var(--accent2), var(--accent)); }
+  .bubble {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .bubble.user { background: rgba(139,92,246,0.08); border-color: rgba(139,92,246,0.2); }
+  .source-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .src-chip {
+    background: var(--bg4);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .src-chip:hover { border-color: var(--accent2); color: var(--accent2); }
+  .latency-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    margin-top: 8px;
+  }
+  .latency-tag em { color: var(--accent3); font-style: normal; }
+
+  .hallucination-banner {
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #fca5a5;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .chat-input-area {
+    padding: 16px 28px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    max-width: 836px;
+  }
+  .chat-input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 12px 16px;
+    outline: none;
+    transition: border 0.2s;
+  }
+  .chat-input:focus { border-color: var(--border-active); }
+  .chat-input::placeholder { color: var(--text3); }
+  .send-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    color: white;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .send-btn:hover { background: #7c3aed; transform: translateY(-1px); }
+
+  /* Metrics tab */
+  .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+  .metric-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+  }
+  .metric-label { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
+  .metric-value { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin: 8px 0 4px; }
+  .metric-delta { font-family: var(--mono); font-size: 11px; color: var(--green); }
+  .metric-delta.neg { color: var(--red); }
+
+  /* Chart area */
+  .chart-container {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .chart-title { font-size: 14px; font-weight: 700; margin-bottom: 20px; }
+  .bar-chart { display: flex; gap: 14px; align-items: flex-end; height: 180px; }
+  .bar-group { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; }
+  .bars { display: flex; gap: 4px; align-items: flex-end; height: 160px; }
+  .bar {
+    width: 14px;
+    border-radius: 3px 3px 0 0;
+    transition: opacity 0.2s;
+    cursor: pointer;
+  }
+  .bar:hover { opacity: 0.75; }
+  .bar-label { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+  .legend { display: flex; gap: 14px; margin-bottom: 14px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--text2); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* Radar / spider chart */
+  .radar-container {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  svg.radar { display: block; margin: 0 auto; }
+
+  /* Results table */
+  .results-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--mono); }
+  .results-table th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    border-bottom: 1px solid var(--border);
+  }
+  .results-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .results-table tr:last-child td { border-bottom: none; }
+  .results-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .score-cell { font-weight: 700; }
+  .score-high { color: var(--green); }
+  .score-mid { color: var(--accent3); }
+  .score-low { color: var(--red); }
+  .best-row td { background: rgba(139,92,246,0.05); }
+  .crown { color: var(--accent3); }
+
+  /* Sources tab */
+  .source-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: border 0.2s;
+  }
+  .source-card:hover { border-color: var(--border-active); }
+  .source-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .source-title { font-weight: 700; font-size: 13px; }
+  .source-badge {
+    background: var(--bg4);
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+  }
+  .source-text { font-size: 13px; line-height: 1.7; color: var(--text2); }
+  .source-meta { display: flex; gap: 14px; margin-top: 10px; font-family: var(--mono); font-size: 10px; color: var(--text3); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+  /* tab panels */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-text">RAG Pipeline <span class="logo-badge">v1.0</span></div>
+    <div class="status-pill"><div class="status-dot"></div> Pipeline Ready</div>
+  </div>
+
+  <div class="section-label">🤖 Models</div>
+  <div class="config-item">
+    <div class="config-label">LLM Provider</div>
+    <select class="config-select">
+      <option selected>openai — GPT-3.5-turbo</option>
+      <option>ollama — Mistral (local)</option>
+      <option>google — Gemini Pro</option>
+    </select>
+  </div>
+  <div class="config-item" style="margin-top:8px">
+    <div class="config-label">Embedding Model</div>
+    <select class="config-select">
+      <option selected>huggingface — MiniLM-L6</option>
+      <option>openai — ada-002</option>
+    </select>
+  </div>
+
+  <div class="section-label">📚 Retrieval</div>
+  <div class="config-item">
+    <div class="config-label">Method</div>
+    <select class="config-select">
+      <option selected>similarity</option>
+      <option>mmr (diverse)</option>
+    </select>
+  </div>
+  <div class="config-item" style="margin-top:8px">
+    <div class="config-label">Top-K Results</div>
+    <div class="slider-row">
+      <input type="range" class="slider" min="1" max="10" value="4" oninput="this.nextElementSibling.textContent=this.value">
+      <span class="slider-val">4</span>
+    </div>
+  </div>
+
+  <div class="section-label">✂️ Chunking</div>
+  <div class="config-item">
+    <div class="config-label">Chunk Size</div>
+    <div class="slider-row">
+      <input type="range" class="slider" min="128" max="2048" step="128" value="512" oninput="this.nextElementSibling.textContent=this.value">
+      <span class="slider-val">512</span>
+    </div>
+  </div>
+  <div class="config-item" style="margin-top:8px">
+    <div class="config-label">Overlap</div>
+    <div class="slider-row">
+      <input type="range" class="slider" min="0" max="200" step="10" value="50" oninput="this.nextElementSibling.textContent=this.value">
+      <span class="slider-val">50</span>
+    </div>
+  </div>
+
+  <div class="section-label">🗄️ Vector Store</div>
+  <div class="config-item">
+    <select class="config-select">
+      <option selected>chroma (persistent)</option>
+      <option>faiss (in-memory)</option>
+    </select>
+  </div>
+
+  <div class="section-label">🚀 Advanced</div>
+  <div class="toggle-row">
+    <span class="toggle-label">Query Expansion</span>
+    <div class="toggle" onclick="this.classList.toggle('on')"></div>
+  </div>
+  <div class="toggle-row">
+    <span class="toggle-label">CrossEncoder Rerank</span>
+    <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+  </div>
+
+  <button class="rebuild-btn">🔄 Rebuild Index</button>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-title">🔍 Production RAG Dashboard</div>
+      <div class="page-sub">Retrieval-Augmented Generation · RAGAS Evaluation · Experiment Tracking</div>
+    </div>
+    <div class="stat-chips">
+      <div class="chip">Queries: <span>47</span></div>
+      <div class="chip">Avg Latency: <span>843ms</span></div>
+      <div class="chip">Corpus: <span>5 docs</span></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('chat', this)">💬 Chat</div>
+    <div class="tab" onclick="switchTab('metrics', this)">📊 Metrics</div>
+    <div class="tab" onclick="switchTab('experiments', this)">🧪 Experiments</div>
+    <div class="tab" onclick="switchTab('sources', this)">📄 Sources</div>
+  </div>
+
+  <!-- CHAT TAB -->
+  <div class="tab-panel active" id="tab-chat">
+    <div class="content" id="chat-content">
+      <div class="chat-container">
+
+        <div class="msg">
+          <div class="avatar user">V</div>
+          <div class="bubble user">What are the main components of a RAG pipeline?</div>
+        </div>
+
+        <div class="msg">
+          <div class="avatar bot">🤖</div>
+          <div class="bubble">
+            A RAG pipeline consists of <strong>six core components</strong>:<br><br>
+            1. <strong>Document Corpus</strong> — your source documents (PDF, TXT, DOCX)<br>
+            2. <strong>Chunking Module</strong> — splits documents into retrieval-sized pieces<br>
+            3. <strong>Embedding Model</strong> — encodes text into dense vectors (e.g. MiniLM, ada-002)<br>
+            4. <strong>Vector Store</strong> — persists and indexes embeddings (ChromaDB or FAISS)<br>
+            5. <strong>Retriever</strong> — finds the top-K most relevant chunks for a query<br>
+            6. <strong>LLM Generator</strong> — synthesizes a grounded answer from retrieved context
+            <div class="source-chips">
+              <span class="src-chip">📄 01_rag_overview.txt</span>
+              <span class="src-chip">📄 02_chunking_strategies.txt</span>
+            </div>
+            <div class="latency-tag">⚡ <em>712ms</em> · 2 sources · 4 chunks retrieved</div>
+          </div>
+        </div>
+
+        <div class="msg">
+          <div class="avatar user">V</div>
+          <div class="bubble user">What's the difference between similarity search and MMR?</div>
+        </div>
+
+        <div class="msg">
+          <div class="avatar bot">🤖</div>
+          <div class="bubble">
+            <strong>Similarity Search</strong> ranks candidates purely by cosine distance to the query — always picks the most similar chunks, which can introduce redundancy when multiple chunks say the same thing.<br><br>
+            <strong>MMR (Maximal Marginal Relevance)</strong> balances two goals simultaneously: relevance to the query <em>and</em> diversity among selected chunks. After picking the first chunk, each next selection maximizes relevance while penalizing similarity to already-chosen chunks.<br><br>
+            The tradeoff: MMR improves context recall (covers more ground) at a slight cost to context precision.
+            <div class="source-chips">
+              <span class="src-chip">📄 03_vector_databases.txt</span>
+            </div>
+            <div class="latency-tag">⚡ <em>891ms</em> · 1 source · 3 chunks retrieved</div>
+          </div>
+        </div>
+
+        <div class="msg">
+          <div class="avatar user">V</div>
+          <div class="bubble user">How does RAGAS evaluate faithfulness?</div>
+        </div>
+
+        <div class="msg">
+          <div class="avatar bot">🤖</div>
+          <div class="bubble">
+            RAGAS computes faithfulness in two steps using an LLM as a judge:<br><br>
+            1. <strong>Decomposition</strong>: It breaks the generated answer into atomic factual claims (e.g. "RAG uses vector search" → one claim)<br>
+            2. <strong>Verification</strong>: Each claim is checked against the retrieved context. A claim is "supported" if it can be inferred from the context.<br><br>
+            <code style="background:var(--bg4);padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:12px">Faithfulness = supported_claims / total_claims</code><br><br>
+            A score of <strong>0.91</strong> means 91% of claims were grounded. Below 0.5 is flagged as potential hallucination.
+            <div class="source-chips">
+              <span class="src-chip">📄 04_ragas_evaluation.txt</span>
+            </div>
+            <div class="latency-tag">⚡ <em>1,024ms</em> · 1 source · 4 chunks retrieved</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <input class="chat-input" type="text" placeholder="Ask a question about your documents..." id="chat-input">
+      <button class="send-btn" onclick="sendMsg()">Send ↑</button>
+    </div>
+  </div>
+
+  <!-- METRICS TAB -->
+  <div class="tab-panel" id="tab-metrics">
+    <div class="content">
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Total Queries</div>
+          <div class="metric-value" style="color:var(--accent)">47</div>
+          <div class="metric-delta">↑ +12 today</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Avg Latency</div>
+          <div class="metric-value" style="color:var(--accent2)">843<small style="font-size:18px;font-weight:400">ms</small></div>
+          <div class="metric-delta">↓ −120ms vs baseline</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Sources / Query</div>
+          <div class="metric-value" style="color:var(--accent3)">3.2</div>
+          <div class="metric-delta">top_k = 4</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Faithfulness</div>
+          <div class="metric-value" style="color:var(--green)">0.91</div>
+          <div class="metric-delta">↑ +0.06 vs baseline</div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title">RAGAS Metrics — Current Config vs Baseline</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div> Current (chunk=512, k=4, MMR)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#334155"></div> Baseline (chunk=256, k=2, sim)</div>
+        </div>
+        <div class="bar-chart">
+          <div class="bar-group">
+            <div class="bars">
+              <div class="bar" style="height:146px;background:#8b5cf6" title="0.91"></div>
+              <div class="bar" style="height:122px;background:#334155" title="0.76"></div>
+            </div>
+            <div class="bar-label">Faithfulness</div>
+          </div>
+          <div class="bar-group">
+            <div class="bars">
+              <div class="bar" style="height:141px;background:#8b5cf6" title="0.88"></div>
+              <div class="bar" style="height:115px;background:#334155" title="0.72"></div>
+            </div>
+            <div class="bar-label">Ans. Relevancy</div>
+          </div>
+          <div class="bar-group">
+            <div class="bars">
+              <div class="bar" style="height:133px;background:#8b5cf6" title="0.83"></div>
+              <div class="bar" style="height:110px;background:#334155" title="0.69"></div>
+            </div>
+            <div class="bar-label">Ctx. Precision</div>
+          </div>
+          <div class="bar-group">
+            <div class="bars">
+              <div class="bar" style="height:126px;background:#8b5cf6" title="0.79"></div>
+              <div class="bar" style="height:103px;background:#334155" title="0.64"></div>
+            </div>
+            <div class="bar-label">Ctx. Recall</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="radar-container">
+        <div class="chart-title">Radar: Baseline vs Best Configuration</div>
+        <svg class="radar" width="320" height="260" viewBox="0 0 320 260">
+          <g transform="translate(160,130)">
+            <!-- grid rings -->
+            <polygon points="0,-80 69,-40 69,40 0,80 -69,40 -69,-40" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            <polygon points="0,-60 52,-30 52,30 0,60 -52,30 -52,-30" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            <polygon points="0,-40 35,-20 35,20 0,40 -35,20 -35,-20" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            <polygon points="0,-20 17,-10 17,10 0,20 -17,10 -17,-10" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+            <!-- axes -->
+            <line x1="0" y1="0" x2="0" y2="-80" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+            <line x1="0" y1="0" x2="69" y2="-40" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+            <line x1="0" y1="0" x2="69" y2="40" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+            <line x1="0" y1="0" x2="0" y2="80" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+            <!-- Best config: 0.91, 0.88, 0.79, 0.83 -->
+            <polygon points="0,-72.8 60.7,-35.2 54.5,31.6 0,66.4" fill="rgba(139,92,246,0.2)" stroke="#8b5cf6" stroke-width="2"/>
+            <!-- Baseline: 0.76, 0.72, 0.64, 0.69 -->
+            <polygon points="0,-60.8 49.7,-28.8 44.2,25.6 0,55.2" fill="rgba(51,65,85,0.4)" stroke="#475569" stroke-width="2" stroke-dasharray="4 2"/>
+            <!-- Labels -->
+            <text x="0" y="-92" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="JetBrains Mono,monospace">Faithfulness</text>
+            <text x="84" y="-46" text-anchor="start" fill="#94a3b8" font-size="11" font-family="JetBrains Mono,monospace">Ans. Rel.</text>
+            <text x="84" y="52" text-anchor="start" fill="#94a3b8" font-size="11" font-family="JetBrains Mono,monospace">Ctx. Prec.</text>
+            <text x="0" y="100" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="JetBrains Mono,monospace">Ctx. Recall</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPERIMENTS TAB -->
+  <div class="tab-panel" id="tab-experiments">
+    <div class="content">
+      <div class="chart-container">
+        <div class="chart-title">chunk_size Experiment — RAGAS Metrics by Chunk Size</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div> Faithfulness</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#06b6d4"></div> Answer Relevancy</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> Ctx. Precision</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Ctx. Recall</div>
+        </div>
+        <div class="bar-chart">
+          <div class="bar-group">
+            <div class="bars">
+              <div class="bar" style="height:131px;background:#8b5cf6" title="0.82"></div>
+              <div class="bar" style="height:126px;background:#06b6d4" title="0.79"></div>
+              <div class="bar" style="height:118px;background:#10b981" title="0.74"></div>
+              <div class="bar" style="height:114px;background:#f59e0b" title="0.71"></div>
+            </div>
+            <div class="bar-label">256 chars</div>
+          </div>
+          <div class="bar-group">
+            <div class="bars">
+              <div class="bar" style="height:146px;background:#8b5cf6" title="0.91"></div>
+              <div class="bar" style="height:141px;background:#06b6d4" title="0.88"></div>
+              <div class="bar" style="height:133px;background:#10b981" title="0.83"></div>
+              <div class="bar" style="height:126px;background:#f59e0b" title="0.79"></div>
+            </div>
+            <div class="bar-label">512 chars ⭐</div>
+          </div>
+          <div class="bar-group">
+            <div class="bars">
+              <div class="bar" style="height:138px;background:#8b5cf6" title="0.86"></div>
+              <div class="bar" style="height:134px;background:#06b6d4" title="0.84"></div>
+              <div class="bar" style="height:128px;background:#10b981" title="0.80"></div>
+              <div class="bar" style="height:131px;background:#f59e0b" title="0.82"></div>
+            </div>
+            <div class="bar-label">1024 chars</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title">All Experiment Results</div>
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Run</th>
+              <th>Faithfulness</th>
+              <th>Ans. Rel.</th>
+              <th>Ctx. Prec.</th>
+              <th>Ctx. Recall</th>
+              <th>Mean ↓</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="best-row">
+              <td class="crown">👑</td>
+              <td>chunk_size_512</td>
+              <td class="score-cell score-high">0.910</td>
+              <td class="score-cell score-high">0.880</td>
+              <td class="score-cell score-high">0.830</td>
+              <td class="score-cell score-high">0.790</td>
+              <td class="score-cell score-high">0.853</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>retrieval_method_mmr</td>
+              <td class="score-cell score-high">0.890</td>
+              <td class="score-cell score-high">0.860</td>
+              <td class="score-cell score-mid">0.810</td>
+              <td class="score-cell score-high">0.850</td>
+              <td class="score-cell score-high">0.853</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>chunk_size_1024</td>
+              <td class="score-cell score-high">0.860</td>
+              <td class="score-cell score-high">0.840</td>
+              <td class="score-cell score-mid">0.800</td>
+              <td class="score-cell score-high">0.820</td>
+              <td class="score-cell score-high">0.830</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>top_k_6</td>
+              <td class="score-cell score-high">0.870</td>
+              <td class="score-cell score-high">0.870</td>
+              <td class="score-cell score-mid">0.790</td>
+              <td class="score-cell score-high">0.840</td>
+              <td class="score-cell score-high">0.843</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>top_k_4</td>
+              <td class="score-cell score-high">0.910</td>
+              <td class="score-cell score-high">0.880</td>
+              <td class="score-cell score-high">0.830</td>
+              <td class="score-cell score-mid">0.790</td>
+              <td class="score-cell score-high">0.853</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>top_k_2</td>
+              <td class="score-cell score-high">0.930</td>
+              <td class="score-cell score-high">0.850</td>
+              <td class="score-cell score-high">0.860</td>
+              <td class="score-cell score-mid">0.680</td>
+              <td class="score-cell score-high">0.830</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>chunk_size_256</td>
+              <td class="score-cell score-mid">0.820</td>
+              <td class="score-cell score-mid">0.790</td>
+              <td class="score-cell score-mid">0.740</td>
+              <td class="score-cell score-mid">0.710</td>
+              <td class="score-cell score-mid">0.765</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>retrieval_method_similarity</td>
+              <td class="score-cell score-high">0.910</td>
+              <td class="score-cell score-high">0.880</td>
+              <td class="score-cell score-high">0.830</td>
+              <td class="score-cell score-mid">0.790</td>
+              <td class="score-cell score-high">0.853</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>chunk_overlap_0</td>
+              <td class="score-cell score-mid">0.790</td>
+              <td class="score-cell score-mid">0.810</td>
+              <td class="score-cell score-mid">0.750</td>
+              <td class="score-cell score-mid">0.720</td>
+              <td class="score-cell score-mid">0.768</td>
+            </tr>
+            <tr>
+              <td></td>
+              <td>embedding_model_openai</td>
+              <td class="score-cell score-high">0.920</td>
+              <td class="score-cell score-high">0.900</td>
+              <td class="score-cell score-high">0.850</td>
+              <td class="score-cell score-high">0.810</td>
+              <td class="score-cell score-high">0.870</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOURCES TAB -->
+  <div class="tab-panel" id="tab-sources">
+    <div class="content">
+      <p style="color:var(--text3);font-size:13px;margin-bottom:16px;font-family:var(--mono)">
+        Last query: "How does RAGAS evaluate faithfulness?" — 4 chunks retrieved
+      </p>
+
+      <div class="source-card">
+        <div class="source-header">
+          <div class="source-title">Source 1 — 04_ragas_evaluation.txt</div>
+          <span class="source-badge">Score: 0.94</span>
+        </div>
+        <div class="source-text">
+          RAGAS computes faithfulness in two steps using an LLM as a judge: (1) Decomposition — it breaks the generated answer into atomic factual claims, then (2) Verification — each claim is checked against the retrieved context. A claim is "supported" if it can be inferred from the context. Faithfulness = supported_claims / total_claims.
+        </div>
+        <div class="source-meta">
+          <span>chunk_id: 14</span>
+          <span>size: 487 chars</span>
+          <span>page: 1</span>
+        </div>
+      </div>
+
+      <div class="source-card">
+        <div class="source-header">
+          <div class="source-title">Source 2 — 04_ragas_evaluation.txt</div>
+          <span class="source-badge">Score: 0.87</span>
+        </div>
+        <div class="source-text">
+          A score of 0.9 means 90% of claims are grounded in the retrieved context. Below 0.5 suggests significant hallucination. This metric is reference-free — it only requires the generated answer and the retrieved context, not a ground truth answer.
+        </div>
+        <div class="source-meta">
+          <span>chunk_id: 15</span>
+          <span>size: 421 chars</span>
+          <span>page: 1</span>
+        </div>
+      </div>
+
+      <div class="source-card">
+        <div class="source-header">
+          <div class="source-title">Source 3 — 05_optimization_techniques.txt</div>
+          <span class="source-badge">Score: 0.71</span>
+        </div>
+        <div class="source-text">
+          Monitor faithfulness scores and flag responses below 0.5. Use chain-of-thought prompting to make reasoning traceable. Combine with temperature=0 for deterministic, grounded generation.
+        </div>
+        <div class="source-meta">
+          <span>chunk_id: 23</span>
+          <span>size: 312 chars</span>
+          <span>page: 1</span>
+        </div>
+      </div>
+
+      <div class="source-card">
+        <div class="source-header">
+          <div class="source-title">Source 4 — 01_rag_overview.txt</div>
+          <span class="source-badge">Score: 0.63</span>
+        </div>
+        <div class="source-text">
+          Hallucination is when the LLM generates information not supported by documents. RAG addresses this by providing explicit context and traceable source attribution.
+        </div>
+        <div class="source-meta">
+          <span>chunk_id: 4</span>
+          <span>size: 289 chars</span>
+          <span>page: 1</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function switchTab(name, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+  }
+
+  function sendMsg() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    const content = document.getElementById('chat-content').querySelector('.chat-container');
+
+    // User message
+    const userMsg = document.createElement('div');
+    userMsg.className = 'msg';
+    userMsg.innerHTML = `<div class="avatar user">V</div><div class="bubble user">${text}</div>`;
+    content.appendChild(userMsg);
+    input.value = '';
+
+    // Typing indicator
+    const typing = document.createElement('div');
+    typing.className = 'msg';
+    typing.innerHTML = `<div class="avatar bot">🤖</div><div class="bubble" style="color:var(--text3);font-family:var(--mono);font-size:12px">⟳ Retrieving relevant chunks...</div>`;
+    content.appendChild(typing);
+
+    const chatContent = document.getElementById('chat-content');
+    chatContent.scrollTop = chatContent.scrollHeight;
+
+    setTimeout(() => {
+      typing.querySelector('.bubble').innerHTML = `Based on your document corpus, here is a grounded answer to your question.<br><br>The key concepts relate to how the pipeline processes your query through embedding lookup, retrieves top-k chunks via similarity search, and conditions the LLM response strictly on the retrieved context to minimize hallucination.<br><div class="source-chips"><span class="src-chip">📄 01_rag_overview.txt</span></div><div class="latency-tag">⚡ <em>934ms</em> · 1 source · 3 chunks retrieved</div>`;
+      chatContent.scrollTop = chatContent.scrollHeight;
+    }, 1400);
+  }
+
+  document.getElementById('chat-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendMsg();
+  });
+</script>
+
+</body>
+</html>
